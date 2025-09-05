@@ -37,16 +37,16 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Symbol: VNX"
     )
 
-# Price command (fetches from PancakeSwap GraphQL)
+# Price command (VNX in USD)
 async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
+        # Get pair info from PancakeSwap GraphQL
         url = "https://open-platform.nodereal.io/6041f10687f14750b5c9bac8cd754ee6/pancakeswap-free/graphql"
         query = {
             "query": """
             {
               pair(id: "0x413a061d07bd17cdbcfaf3ab4b28d1118295136d") {
                 token0Price
-                token1Price
                 reserveUSD
               }
             }
@@ -54,13 +54,23 @@ async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         r = requests.post(url, json=query)
         data = r.json()["data"]["pair"]
+        vnx_in_bnb = float(data['token0Price'])
+
+        # Fetch BNB price in USD from CoinGecko
+        coingecko = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd").json()
+        bnb_in_usd = float(coingecko['binancecoin']['usd'])
+
+        # Calculate VNX price in USD
+        vnx_in_usd = vnx_in_bnb * bnb_in_usd
+        reserve_usd = float(data['reserveUSD'])
+
         await update.message.reply_text(
-            f"VNX Price Info:\n"
-            f"1 VNX = {data['token0Price']} BNB\n"
-            f"Reserve (USD): {data['reserveUSD']}"
+            f"📊 VNX Price Info:\n"
+            f"1 VNX = ${vnx_in_usd:,.6f} USD\n"
+            f"Liquidity Pool Reserve: ${reserve_usd:,.2f}"
         )
-    except Exception:
-        await update.message.reply_text("Error fetching price data.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error fetching price data: {e}")
 
 # Other commands
 async def staking(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,7 +95,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "/start - Begin your VyronexVNX journey\n"
         "/about - Learn about VyronexVNX & the bot\n"
-        "/price - Check the current VNX token price\n"
+        "/price - Check the current VNX token price in USD\n"
         "/staking - View staking options & rewards\n"
         "/farming - Explore available farming pools\n"
         "/airdrop - Get details about ongoing or upcoming airdrops\n"
